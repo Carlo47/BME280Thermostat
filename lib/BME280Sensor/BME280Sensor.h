@@ -42,7 +42,7 @@ class BME280Sensor : public Adafruit_BME280
         void printSensorData();                      // print measurements to the monitor
 
     private:
-        float   calculateDewPoint();
-        float   calculateNpLocal();
+        float   _calculateDewPoint();
+        float   _calculateNpLocal();
 };
 #endif

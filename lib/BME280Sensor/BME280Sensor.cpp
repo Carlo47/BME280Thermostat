@@ -27,7 +27,7 @@
 /**
  * Calculate dewpoint from given temperature and rel. humidity
  */
-float BME280Sensor::calculateDewPoint() 
+float BME280Sensor::_calculateDewPoint() 
 {
     float k;
     k = log(_sensorData.relHumidity/100) + (17.62 * _sensorData.tCelsius) / (243.12 + _sensorData.tCelsius);
@@ -46,7 +46,7 @@ float BME280Sensor::calculateDewPoint()
  * H0 = T0 / gradT = 44330 m
  * pLocal = P0 * (1 - h/H0) ^ K0
  */ 
-float BME280Sensor::calculateNpLocal()
+float BME280Sensor::_calculateNpLocal()
 {
     return 1013.25 * pow( (1.0 - _sensorData.aLocal / 44330.0), 5.255);
 }
@@ -56,8 +56,8 @@ void BME280Sensor::readSensor()
     _sensorData.tCelsius    = readTemperature();
     _sensorData.relHumidity = readHumidity();
     _sensorData.pLocal      = readPressure() / 100.0;
-    _sensorData.dewPoint    = calculateDewPoint();
-    _sensorData.npLocal     = calculateNpLocal();      
+    _sensorData.dewPoint    = _calculateDewPoint();
+    _sensorData.npLocal     = _calculateNpLocal();      
 }
 
 /**
@@ -86,7 +86,7 @@ bool BME280Sensor::begin()
 void BME280Sensor::setLocalAltitude(float meterAltitude)
 {
     _sensorData.aLocal  = meterAltitude;
-    _sensorData.npLocal = calculateNpLocal();
+    _sensorData.npLocal = _calculateNpLocal();
 }
 
 /**
