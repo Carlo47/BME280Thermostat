@@ -1,6 +1,6 @@
 /**
  * Class        BME280Sensor.cpp
- * Author       2021-10-22 Charles Geiser (https://www.dodeka.ch)
+ * Author       2021-10-25 Charles Geiser (https://www.dodeka.ch)
  *
  * Purpose      Implements a class for the BME280 temperature, humidity and air pressure sensor
  *              It also calculates the dewpoint and the local standard air pressure when local
@@ -9,11 +9,11 @@
  *              They can be copied to a variable of the same type in the main program 
  *              using the getSensorData() method. 
  * 
- * Methods      bool begin();       // to be called in setup of main program
- *              void readSensor();  // updates measurements into BME280SensorData
- *              void getSensorData(BME280SensorData &data);  // copy measurements into the variable data
- *              void setLocalAltitude(float meter);          // set the local altitude in meters above sea level
- *              void printSensorData();                      // print measurements to the monitor
+ * Methods      bool begin();                                // To be called in setup of main program
+ *              void readSensor();                           // Updates the measured values in the data structure BME280SensorData
+ *              void getSensorData(BME280SensorData &data);  // Copy measured values into the variable data
+ *              void setLocalAltitude(float meter);          // Sets the local altitude in meters above sea level
+ *              void printSensorData();                      // Outputs the measured values to the monitor
  * 
  * 
  * Board        Arduino UNO

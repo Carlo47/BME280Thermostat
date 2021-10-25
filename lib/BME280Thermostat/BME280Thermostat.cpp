@@ -1,20 +1,18 @@
 /**
  * Class        BME280Thermostat.cpp
- * Author       2021-10-22 Charles Geiser (https://www.dodeka.ch)
+ * Author       2021-10-25 Charles Geiser (https://www.dodeka.ch)
  *
- * Purpose      Implements a class for the BME280 temperature, humidity and air pressure sensor
- *              It also calculates the dewpoint and the local standard air pressure when local
- *              altitude is known.
- *              The sensor readings are stored in the BME280SensorData data structure. 
- *              They can be copied to a variable of the same type in the main program 
- *              using the getSensorData() method. 
+ * Purpose      Implements a class BME280Thermostat that allows to switch a heater on or off
  * 
- * Methods      bool begin();       // to be called in setup of main program
- *              void readSensor();  // updates measurements into BME280SensorData
- *              void getSensorData(BME280SensorData &data);  // copy measurements into the variable data
- *              void setLocalAltitude(float meter);          // set the local altitude in meters above sea level
- *              void printSensorData();                      // print measurements to the monitor
- * 
+ * Methods      void loop();                                     // To be called in the loop of your main program
+ *              void setRefreshInterval(uint32_t msRefresh)      // Sets the update interval between measurements
+ *              void setLimitLow(float tLow)                     // Sets the lower temperature limit
+ *              void setLimitHigh(float tHigh)                   // Sets the upper temperature limit
+ *              void setTempDelta(float delta)                   // Sets the allowed temperature range
+ *              void addOnLowTempReachedCB(CallbackFunction cb)  // Adds a callback to be called when temperature drops below lower limit
+ *              void addOnHighTempReachedCB(CallbackFunction cb) // Adds a callback to be called when temperature exceeds the upper limit
+ *              void addOnDataReadyCB(CallbackFunction cb)       // Adds a callback to be called regularly every interval
+ *              void printThermostatData()                       // Outputs the parameters of the thermostat to the monitor
  * 
  * Board        Arduino UNO
  * 

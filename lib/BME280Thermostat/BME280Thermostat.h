@@ -1,6 +1,6 @@
 /**
  * Header       BME280Sensor.h
- * Author       2021-10-22 Charles Geiser (https://www.dodeka.ch)
+ * Author       2021-10-25 Charles Geiser (https://www.dodeka.ch)
  * 
  * Purpose      Declaration of the class BME280Thermostat
  *              Inherits from BME280Sensor class
@@ -19,10 +19,10 @@ class BME280ThermostatData
 {
     public:
         uint32_t msPrevious = 0;
-        uint32_t msRefresh  = 10000;
+        uint32_t msRefresh  = 10000;   // user defined refresh interval
         float    tLimitHigh = 20.0;    // user defined upper temperature limit
-        float    tLimitLow  = 19.0;    // user defined lower temperature limit (or calculated when max deviation is set)
-        float    tDelta     =  1.0;    // user defined max deviation from upper temperature (or calculated when lower temperature is set)
+        float    tLimitLow  = 19.0;    // user defined lower temperature limit (or calculated, when temperature range is set)
+        float    tDelta     =  1.0;    // user defined temperature range (or calculated, when lower temperature is set)
 };
 
 class BME280Thermostat : public BME280Sensor
