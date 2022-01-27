@@ -1,39 +1,73 @@
 /**
  * Class        BME280Sensor.cpp
- * Author       2021-10-25 Charles Geiser (https://www.dodeka.ch)
- *
- * Purpose      Implements a class for the BME280 temperature, humidity and air pressure sensor
- *              It also calculates the dewpoint and the local standard air pressure when local
- *              altitude is known.
- *              The sensor readings are stored in the BME280SensorData data structure. 
- *              They can be copied to a variable of the same type in the main program 
- *              using the getSensorData() method. 
+ * Author       2022-01-24 Charles Geiser
  * 
- * Methods      bool begin();                                // To be called in setup of main program
- *              void readSensor();                           // Updates the measured values in the data structure BME280SensorData
- *              void getSensorData(BME280SensorData &data);  // Copy measured values into the variable data
- *              void setLocalAltitude(float meter);          // Sets the local altitude in meters above sea level
- *              void printSensorData();                      // Outputs the measured values to the monitor
+ * Purpose      A class to measure temperature, relative humidity and air pressure
+ *              by means of a BME280 sensor. It also calculates the dewpoint and 
+ *              the local standard air pressure when local altitude is known.
+ *              If the local altitude is known, the sensor can be calibrated to 
+ *              this height and used as an altimeter.  
  * 
- * 
- * Board        Arduino UNO
- * 
- * Remarks      
- * 
- * References    
- */
-#include "BME280Sensor.h"
+ * Board        ESP32 DoIt DevKit V1
+ * Remarks
+ * References   
+ */ 
+#include "BME280sensor.h"
 
-/**
- * Calculate dewpoint from given temperature and rel. humidity
- */
-float BME280Sensor::_calculateDewPoint() 
+/** Initializes the sensor and reads the measurement data 
+ * or gives an error message if the sensor was not found 
+ * and stops the program
+*/
+void BME280Sensor::setup()
 {
-    float k;
-    k = log(_sensorData.relHumidity/100) + (17.62 * _sensorData.tCelsius) / (243.12 + _sensorData.tCelsius);
-    return 243.12 * k / (17.62 - k);
+    char buf[40];
+    int tries = 5;
+    while (! begin(_i2cAddress) && (tries > 0))
+    {
+        delay(1000);
+        tries--;
+    }
+    if(tries <= 0)
+    {
+        snprintf(buf, sizeof(buf),"BME280 not found at i2c address %#x", _i2cAddress);
+        Serial.println(buf);
+        while(true) delay(10000UL);
+    }
+    _readSensor();
 }
 
+/**
+ * Adjusts the normal pressure at sea level so that the 
+ * measured local air pressure corresponds to the local altitude.
+ * 
+ * altitude     local altitude in m.a.s.l. 
+ */
+void BME280Sensor::calibrateForAltitude(float altitude)
+{
+    char buf[128];
+    _pSeaLevel = seaLevelForAltitude(altitude, _pLocal);
+    Serial.println("Calibrate for Altitude:");
+    snprintf(buf, sizeof(buf), "Altitude = %6.1f, p0 = %6.1f, pLocal = %6.1f", (double)altitude, (double)_pSeaLevel, (double)_pLocal);
+    Serial.println(buf);
+}
+
+/**
+ * Set the local altitude in meter above sea level 
+ */
+void BME280Sensor::setLocalAltitude(float altitude)
+{
+    _altLocal = altitude;
+}
+
+/**
+ * Calculate dew point in °C from temperature and humidity
+ */
+float BME280Sensor::_calculateDewPoint(void) 
+{
+    float k;
+    k = log(_relHumidity/100) + (17.62 * _tCelsius) / (243.12 + _tCelsius);
+    return 243.12 * k / (17.62 - k);
+}
 
 /**
  * Calculate local normal air pressure at given altitude
@@ -48,76 +82,80 @@ float BME280Sensor::_calculateDewPoint()
  */ 
 float BME280Sensor::_calculateNpLocal()
 {
-    return 1013.25 * pow( (1.0 - _sensorData.aLocal / 44330.0), 5.255);
-}
-
-void BME280Sensor::readSensor()
-{
-    _sensorData.tCelsius    = readTemperature();
-    _sensorData.relHumidity = readHumidity();
-    _sensorData.pLocal      = readPressure() / 100.0;
-    _sensorData.dewPoint    = _calculateDewPoint();
-    _sensorData.npLocal     = _calculateNpLocal();      
+    _npLocal = 1013.25 * pow( (1.0 - _altLocal / 44330.0), 5.255);
+    return _npLocal;
 }
 
 /**
- * Initialize the sensor and read available data
+ * Read the sensor and calculate local normal pressure
+ * and dew point
  */
-bool BME280Sensor::begin()
+void BME280Sensor::_readSensor()
 {
-    char buf[64];
-    if (! Adafruit_BME280::begin(_i2cAddress))
-    {
-        snprintf(buf, sizeof(buf), R"(===> BME280Sensor not found on i2c address %u / 0x%x)", _i2cAddress, _i2cAddress);
-        Serial.println(buf);
-        return false;
-    }
-    else
-    {
-        readSensor();
-        return true;
-    }    
+    _pLocal      = readPressure() / 100.0;
+    _relHumidity = readHumidity();
+    _tCelsius    = readTemperature();
+    _tFahrenheit = _tCelsius * 9.0 / 5.0 + 32.0;
+    //_altLocal    = readAltitude(_pSeaLevel); // altitude is set by user
+    _npLocal     = _calculateNpLocal();
+    _dewPoint    = _calculateDewPoint();      
+}
+float BME280Sensor::getCelsius()
+{
+    _readSensor();
+    return _tCelsius;
 }
 
-/**
- * Set the local altitude in meters above sea level (masl)
- * and calculate the standard air pressure for that altitude
- */
-void BME280Sensor::setLocalAltitude(float meterAltitude)
+float BME280Sensor::getFahrenheit()
 {
-    _sensorData.aLocal  = meterAltitude;
-    _sensorData.npLocal = _calculateNpLocal();
+    _readSensor();
+    return _tFahrenheit;
 }
 
-/**
- * Print measured sensor data
- */
-void BME280Sensor::printSensorData()
+float BME280Sensor::getRelHumidity()
 {
-    char buf[208];
-
-    snprintf(buf, sizeof(buf), R"(
-    Temperature   %6.1f °C
-    Humidity      %6.1f %%rF
-    Air pressure  %6.1f hPa
-    Dewpoint      %6.1f °C
-    SeaLevel prs  %6.1f hPa
-    Altitude      %6.1f masl
-    Standard prs  %6.1f hPa)", 
-        (double)_sensorData.tCelsius,
-        (double)_sensorData.relHumidity,
-        (double)_sensorData.pLocal,
-        (double)_sensorData.dewPoint,
-        (double)_sensorData.pSeaLevel,
-        (double)_sensorData.aLocal,
-        (double)_sensorData.npLocal);
-    Serial.println(buf);
+    _readSensor();
+    return _relHumidity;
 }
 
-/**
- * Get sensor readings into the variable data
- */
-void BME280Sensor::getSensorData(BME280SensorData &data)
+float BME280Sensor::getDewPoint()
 {
-    data = _sensorData;
+    _readSensor();
+    return _dewPoint;
+}
+
+float BME280Sensor::getLocalPressure()
+{
+    _readSensor();
+    return _pLocal;    
+}
+
+float BME280Sensor::getLocalAltitude()
+{
+    _readSensor();
+    return _altLocal;    
+}
+
+void BME280Sensor::printSensorValues()
+{
+    char buf[232];
+    _readSensor();
+    // printf("Temperature      %6.1f °C\n",    _tCelsius);
+    // printf("Dewpoint         %6.1f °C\n",    _dewPoint);
+    // printf("Humidity         %6.1f %%rH\n",  _relHumidity);
+    // printf("Local pressure   %6.1f hPa\n",   _pLocal);
+    // printf("Local altitude   %6.1f m.a.s.l.\n", _altLocal);
+    // printf("nP at altitude   %6.1f hPa\n", _npLocal);
+    // printf("nP at sea level  %6.1f hPa\n", _pSeaLevel);
+    snprintf(buf, sizeof(buf), R"(---   Sensor Readings   ---
+Temperature      %6.1f °C
+Dewpoint         %6.1f °C
+Humidity         %6.1f %%rH
+Local pressure   %6.1f hPa
+Local altitude   %6.1f m.a.s.l.
+nP at altitude   %6.1f hPa
+nP at sea level  %6.1f hPa
+)", (double)_tCelsius, (double)_dewPoint, (double)_relHumidity, (double)_pLocal, 
+       (double)_altLocal, (double)_npLocal,  (double)_pSeaLevel);
+Serial.println(buf);
 }

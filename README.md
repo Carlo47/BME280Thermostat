@@ -2,103 +2,88 @@
 
 The BME280 sensor measures temperature, relative humidity and air 
 pressure. Fortunately, the libraries Adafruit_Sensor and 
-Adafruit_BME280 make it easier for us to read out the measured 
-values via the I2C interface. Nevertheless, we want to wrap the 
-functionality in a separate class BME280Sensor and supplement it 
-with the methods for calculating the dew point and the normal 
-pressure for the current altitude. The measured values and the 
-results of the calculations should be made available to us by the 
-class as a whole in a data structure.
+Adafruit_BME280 make it easier to read out the measured 
+values via the I2C interface. Nevertheless, I want to wrap the 
+functionality in a separate class ***BME280Sensor*** and supplement it with the methods for calculating the dew point and the normal 
+pressure for the current altitude. We want to query measured values and calculated quantities by appropriate methods.
 
 As an application of this, I simulate a thermostat in another class 
-BME280Thermostat, which only switches an LED on and off instead of
-a heater. Via a simple CLI user interface the measured values can 
-be retrieved and the parameters can be changed. 
+***BME280Thermostat***, which only switches a LED on and off instead of a heater. The measured values can be queried and the parameters changed via a simple CLI menu. 
 
 ## Parts
 
-A BME280 Sensor Breakout and of course an Arduino UNO or similar
-microcontroller.
+A ***BME280 Sensor Breakout*** and of course an ***Arduino UNO***, a ***Wemos D1*** or an ***ESP32 DevKit V1***.
 
 ![BME280](images/BME280Sensor.jpg)
 
 ## Wiring
-       BME280              Arduino UNO
-     .--------.          .-------------
-    |     Vcc o --->     o 5V
-    |     GND o --->     o GND
-    |     SCK o --->     o A5
-    |     SDA o --->     o A4
-    |     CSB o          |
-    |     SDO o          |
-     `--------´          `-------------
+                           Arduino UNO
+       BME280              Wemos D1               ESP32
+     .--------.          .------------      .------------
+    |     Vcc o --->     o 3V3              o 3V3
+    |     GND o --->     o GND              o GND
+    |     SCK o --->     o A5               o GPIO_NUM_22 
+    |     SDA o --->     o A4               o GPIO_NUM_21
+    |     CSB o          |                  |
+    |     SDO o          |                  |
+     `--------´          `------------      `------------
 
-## Class BME280SensorData
-This class provides all relevant data. The values shown indicate 
-default values.
-```
-class BME280SensorData
-{
-    public:
-        float tCelsius    = 20.0;    // sensor reading
-        float relHumidity = 40.0;    // sensor reading
-        float pLocal      = 975.0;   // sensor reading
-        float dewPoint    =   6.0;   // calculated dewpoint for temperature=20°C and humidity=40.0%
-        float aLocal      = 453.0;   // user defined local altitude
-        float npLocal     = 960.0;   // calculated normal air pressure for local altitude=453müM
-        float pSeaLevel   = 1013.25; // standard air pressure at sealevel
-};
-```
 ## Class BME280Sensor
+This class provides all relevant data through appropriate methods.
 ```
 class BME280Sensor : public Adafruit_BME280
-{
-    protected:
-        uint8_t          _i2cAddress;
-        BME280SensorData _sensorData;
-
+{  
     public:
-        BME280Sensor(uint8_t i2cAddress) : Adafruit_BME280(), _i2cAddress(i2cAddress) {}
-        bool begin();       // to be called in setup of main program
-        void readSensor();  // updates measurements into BME280SensorData
-        void getSensorData(BME280SensorData &data);  // copy measurements into the variable data
-        void setLocalAltitude(float meter);          // set the local altitude in meters above sea level
-        void printSensorData();                      // print measurements to the monitor
+        BME280Sensor(uint8_t i2cAddress) : Adafruit_BME280(),
+                    _i2cAddress(i2cAddress) {}
 
-    private:
-        float   _calculateDewPoint();
-        float   _calculateNpLocal();
-};
+        void  setup();
+        float getCelsius();
+        float getFahrenheit();
+        float getRelHumidity();
+        float getDewPoint();
+        float getLocalPressure();
+        float getLocalAltitude();
+        void  setLocalAltitude(float altitude);
+        void  calibrateForAltitude(float altitude); 
+        void  printSensorValues();
 ```
 
 ## Class BME280Thermostat
 ```
-class BME280Thermostat : public BME280Sensor
+using Callback = void(&)(); // Declaration of a reference to a
+                            // callback function that must be 
+                            // provided by the user.
+  
+class BME280Thermostat : public BME280Sensor 
 {
-    private:
-        static void _nop(){};
-        BME280ThermostatData  _data;
-        CallbackFunction _onLowTempReached  = _nop;
-        CallbackFunction _onHighTempReached = _nop;
-        CallbackFunction _onDataReady       = _nop;
+  public:
+    BME280Thermostat(uint8_t i2cAddress, Callback onLowTemp, 
+                     Callback onHighTemp, Callback onDataReady) : 
+                     BME280Sensor(i2cAddress), 
+                     _onLowTemp(onLowTemp), _onHighTemp(onHighTemp),
+                     _onDataReady(onDataReady) {}
 
-    public:
-        BME280Thermostat(uint8_t i2cAddress) : BME280Sensor(i2cAddress) {}
-
-        void setRefreshInterval(uint32_t msRefresh);
-        void setLimitHigh(float tHigh);
-        void setLimitLow(float tLow);
-        void setTempDelta(float delta);
-        void getThermostatData(BME280ThermostatData &data);
-        void loop();
-        void addOnLowTempReachedCB(CallbackFunction cb);
-        void addOnHighTempReachedCB(CallbackFunction cb);
-        void addOnDataReadyCB(CallbackFunction cb);
-        void printThermostatData();
-};
+    void setup();     // to be called in the main setup
+    void loop();      // to be called in the main loop
+    void enable();    // enable switching on/off of the thermostat 
+    void disable();   // disable switching on/off of the thermostat
+    bool isEnabled(); // query on/off state of the thermostat
+    void setRefreshInterval(uint32_t msRefresh);  // msec
+    void setLimitLow(float tLimitLow);            // °C
+    void setLimitHigh(float tLimitHigh);          // °C
+    float getLimitLow();
+    float getLimitHigh();
+    uint32_t getRefreshInterval();
+    void printSettings();
 ```
 
-
 ## User Interface (CLI)
+The function of the thermostat can be tested via a CLI menu. The measured values and the settings are displayed. 
 
-![CLI](images/cliMenuBME280Thermostat.jpg)
+![CLI](images/BME280Thermostat_cliMenu.jpg)
+
+![READINGS](images/BME280Thermostat_readings.jpg)
+
+## Program
+The program can be compiled for all 3 microcontrollers by simply switching the PlatformIO Project Environment.

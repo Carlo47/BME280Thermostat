@@ -1,51 +1,44 @@
 /**
- * Header       BME280Sensor.h
- * Author       2021-10-25 Charles Geiser (https://www.dodeka.ch)
+ * BME280Thermostat.h
  * 
- * Purpose      Declaration of the class BME280Thermostat
- *              Inherits from BME280Sensor class
- * 
- * Constructor
- * arguments    i2cAddress    Address of the I2C-Interface of the BME280 sensor
+ * Declaration of the derived class BME280Thermostat. It inherits from the base class
+ * BME280Sensor. The callbacks onLowTemp(), onHighTemp and onDataReady() must be supplied
+ * by the application program.
  */
+#ifndef _BME280THERMOSTAT_H_
+#define _BME280THERMOSTAT_H_
 #include "BME280Sensor.h"
 
-#ifndef _BME280THERMOSTAT_H
-#define _BME280THERMOSTAT_H
+using Callback = void(&)();
 
-typedef void(*CallbackFunction)();
-
-class BME280ThermostatData
+class BME280Thermostat : public BME280Sensor 
 {
-    public:
-        uint32_t msPrevious = 0;
-        uint32_t msRefresh  = 10000;   // user defined refresh interval
-        float    tLimitHigh = 20.0;    // user defined upper temperature limit
-        float    tLimitLow  = 19.0;    // user defined lower temperature limit (or calculated, when temperature range is set)
-        float    tDelta     =  1.0;    // user defined temperature range (or calculated, when lower temperature is set)
-};
+  public:
+    BME280Thermostat(uint8_t i2cAddress, 
+      Callback onLowTemp, Callback onHighTemp, Callback onDataReady) : 
+      BME280Sensor(i2cAddress), _onLowTemp(onLowTemp), _onHighTemp(onHighTemp), _onDataReady(onDataReady)
+    {}
 
-class BME280Thermostat : public BME280Sensor
-{
-    private:
-        static void _nop(){};
-        BME280ThermostatData  _data;
-        CallbackFunction _onLowTempReached  = _nop;
-        CallbackFunction _onHighTempReached = _nop;
-        CallbackFunction _onDataReady       = _nop;
+    void setup();
+    void loop();
+    void enable();
+    void disable();
+    bool isEnabled();
+    void setRefreshInterval(uint32_t msRefresh);  // msec
+    void setLimitLow(float tLimitLow);            // °C
+    void setLimitHigh(float tLimitHigh);          // °C
+    float getLimitLow();
+    float getLimitHigh();
+    uint32_t getRefreshInterval();
+    void printSettings();
 
-    public:
-        BME280Thermostat(uint8_t i2cAddress) : BME280Sensor(i2cAddress) {}
-
-        void setRefreshInterval(uint32_t msRefresh);
-        void setLimitHigh(float tHigh);
-        void setLimitLow(float tLow);
-        void setTempDelta(float delta);
-        void getThermostatData(BME280ThermostatData &data);
-        void loop();
-        void addOnLowTempReachedCB(CallbackFunction cb);
-        void addOnHighTempReachedCB(CallbackFunction cb);
-        void addOnDataReadyCB(CallbackFunction cb);
-        void printThermostatData();
+  private:
+    bool     _isEnabled  = false;
+    float    _tLimitLow  = 18.0;
+    float    _tLimitHigh = 21.0;
+    uint32_t _msRefresh  = 5000;
+    Callback _onLowTemp;
+    Callback _onHighTemp;
+    Callback _onDataReady;
 };
 #endif
